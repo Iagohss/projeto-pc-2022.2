@@ -1,1 +1,1 @@
-# lab-pc-2022.2
+# Lab de Programação Concorrente 2022.2
