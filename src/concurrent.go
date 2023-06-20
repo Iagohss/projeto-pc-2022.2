@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -41,7 +42,7 @@ func main() {
 		actorID = actorID[1 : len(actorID)-1]
 
 		go doGetAtor(actorID)
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) //Lembrar de retirar
 	}
 }
 
@@ -68,12 +69,25 @@ func doGetAtor(actorID string) {
 		return
 	}
 
+	var wg sync.WaitGroup
+	moviesMap := make(map[string]float32)
 	for _, movie := range ator.Movies {
-		go doGetMovie(movie)
+		wg.Add(1)
+		go doGetMovie(&wg, movie, moviesMap)
 	}
+
+	wg.Wait()
+	var sum float32
+	for _, rating := range moviesMap {
+		fmt.Printf("%s : %.2f\n", actorID, rating)
+		sum += rating
+	}
+	fmt.Printf("Average of %s is: %.2f\n", actorID, sum/float32(len(moviesMap)))
 }
 
-func doGetMovie(movieID string) {
+func doGetMovie(wg *sync.WaitGroup, movieID string, moviesMap map[string]float32) {
+	defer wg.Done()
+
 	url := fmt.Sprintf("http://150.165.15.91:8001/movies/%s", movieID)
 
 	response, err := http.Get(url)
@@ -96,5 +110,5 @@ func doGetMovie(movieID string) {
 		return
 	}
 
-	fmt.Println(movie.AverageRating)
+	moviesMap[movieID] = movie.AverageRating
 }
