@@ -41,29 +41,18 @@ func main() {
 		actorID := scanner.Text()
 		actorID = actorID[1 : len(actorID)-1]
 
-		go doGetAtor(actorID)
+		go handleActor(actorID)
 		time.Sleep(1 * time.Second) //Lembrar de retirar
 	}
 }
 
-func doGetAtor(actorID string) {
+func handleActor(actorID string) {
 	url := fmt.Sprintf("http://150.165.15.91:8001/actors/%s", actorID)
-
-	response, err := http.Get(url)
-	if err != nil {
-		fmt.Printf("Erro ao fazer a requisição: %s\n", err)
-		return
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		fmt.Printf("Erro ao ler o corpo da resposta: %s\n", err)
-		return
-	}
+	response := doGet(url)
+	body := readBody(response)
 
 	var ator Ator
-	err = json.Unmarshal([]byte(body), &ator)
+	err := json.Unmarshal([]byte(body), &ator)
 	if err != nil {
 		fmt.Println("Erro ao decodificar JSON:", err)
 		return
@@ -73,7 +62,7 @@ func doGetAtor(actorID string) {
 	moviesMap := make(map[string]float32)
 	for _, movie := range ator.Movies {
 		wg.Add(1)
-		go doGetMovie(&wg, movie, moviesMap)
+		go getMovieRating(&wg, movie, moviesMap)
 	}
 
 	wg.Wait()
@@ -85,30 +74,36 @@ func doGetAtor(actorID string) {
 	fmt.Printf("Average of %s is: %.2f\n", actorID, averageRating)
 }
 
-func doGetMovie(wg *sync.WaitGroup, movieID string, moviesMap map[string]float32) {
+func getMovieRating(wg *sync.WaitGroup, movieID string, moviesMap map[string]float32) {
 	defer wg.Done()
 
 	url := fmt.Sprintf("http://150.165.15.91:8001/movies/%s", movieID)
-
-	response, err := http.Get(url)
-	if err != nil {
-		fmt.Printf("Erro ao fazer a requisição: %s\n", err)
-		return
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		fmt.Printf("Erro ao ler o corpo da resposta: %s\n", err)
-		return
-	}
+	response := doGet(url)
+	body := readBody(response)
 
 	var movie Movie
-	err = json.Unmarshal([]byte(body), &movie)
+	err := json.Unmarshal([]byte(body), &movie)
 	if err != nil {
 		fmt.Println("Erro ao decodificar JSON:", err)
 		return
 	}
 
 	moviesMap[movieID] = movie.AverageRating
+}
+
+func doGet(url string) *http.Response {
+	response, err := http.Get(url)
+	if err != nil {
+		log.Fatal("Erro ao fazer a requisição:", err.Error())
+	}
+
+	return response
+}
+
+func readBody(response *http.Response) []byte {
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal("Erro ao ler o corpo da resposta:", err.Error())
+	}
+	return body
 }
