@@ -17,6 +17,16 @@ type Ator struct {
 	Movies []string `json:"movies"`
 }
 
+type Movie struct {
+	Id              string   `json:"id"`
+	Title           string   `json:"title"`
+	AverageRating   float32  `json:"averagerating"`
+	NumberOfVotes   int      `json:"numberOfVotes"`
+	StartYear       int      `json:"startYear"`
+	LenghtInMinutes int      `json:"lenghtInMinutes"`
+	Genres          []string `json:"genres"`
+}
+
 func main() {
 	file, err := os.Open("actors.txt")
 	if err != nil {
@@ -30,12 +40,12 @@ func main() {
 		actorID := scanner.Text()
 		actorID = actorID[1 : len(actorID)-1]
 
-		go doGet(actorID)
+		go doGetAtor(actorID)
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func doGet(actorID string) {
+func doGetAtor(actorID string) {
 	url := fmt.Sprintf("http://150.165.15.91:8001/actors/%s", actorID)
 
 	response, err := http.Get(url)
@@ -58,5 +68,33 @@ func doGet(actorID string) {
 		return
 	}
 
-	fmt.Println(ator.Movies)
+	for _, movie := range ator.Movies {
+		go doGetMovie(movie)
+	}
+}
+
+func doGetMovie(movieID string) {
+	url := fmt.Sprintf("http://150.165.15.91:8001/movies/%s", movieID)
+
+	response, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("Erro ao fazer a requisição: %s\n", err)
+		return
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		fmt.Printf("Erro ao ler o corpo da resposta: %s\n", err)
+		return
+	}
+
+	var movie Movie
+	err = json.Unmarshal([]byte(body), &movie)
+	if err != nil {
+		fmt.Println("Erro ao decodificar JSON:", err)
+		return
+	}
+
+	fmt.Println(movie.AverageRating)
 }
