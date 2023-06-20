@@ -79,10 +79,10 @@ func doGetAtor(actorID string) {
 	wg.Wait()
 	var sum float32
 	for _, rating := range moviesMap {
-		fmt.Printf("%s : %.2f\n", actorID, rating)
 		sum += rating
 	}
-	fmt.Printf("Average of %s is: %.2f\n", actorID, sum/float32(len(moviesMap)))
+	averageRating := sum / float32(len(moviesMap))
+	fmt.Printf("Average of %s is: %.2f\n", actorID, averageRating)
 }
 
 func doGetMovie(wg *sync.WaitGroup, movieID string, moviesMap map[string]float32) {
