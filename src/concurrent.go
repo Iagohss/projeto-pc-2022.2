@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+const (
+	ACTORS_PREFIX    = "actors/"
+	MOVIES_PREFIX    = "movies/"
+	BASE_URL         = "http://150.165.15.91:8001/"
+	ACTORS_DATA_PATH = "./data/actors.txt"
+	NUMBER_OF_ACTORS = 100
+)
+
 type Ator struct {
 	Id        string   `json:"id"`
 	Name      string   `json:"name"`
@@ -27,7 +35,8 @@ type Movie struct {
 
 func main() {
 	start := time.Now()
-	file, err := os.Open("actors.txt")
+
+	file, err := os.Open(ACTORS_DATA_PATH)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +48,6 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 	var wgAVGs sync.WaitGroup
-
 	cont := 0
 	for scanner.Scan() {
 		actorID := scanner.Text()
@@ -50,7 +58,7 @@ func main() {
 
 		//limitando o número de atores analisados, caso contrário o socket crasha
 		cont++
-		if cont == 100 {
+		if cont == NUMBER_OF_ACTORS {
 			break
 		}
 	}
@@ -60,7 +68,8 @@ func main() {
 	<-done
 
 	elapsed := time.Since(start)
-	fmt.Printf("Total execution time in millis: %d", elapsed)
+	fmt.Println("\n--------------------------------------------------")
+	fmt.Printf("Total execution time in millis: %d", elapsed/1000000)
 }
 
 func ranking(results chan Ator, done chan<- int) {
@@ -87,20 +96,21 @@ func ranking(results chan Ator, done chan<- int) {
 
 func handleActor(wgAVGs *sync.WaitGroup, actorID string, results chan<- Ator) {
 	defer wgAVGs.Done()
-	url := fmt.Sprintf("http://150.165.15.91:8001/actors/%s", actorID)
+	url := fmt.Sprintf("%s%s%s", BASE_URL, ACTORS_PREFIX, actorID)
 	response := doGet(url)
-	body := readBody(response)
 
 	var ator Ator
-	err := json.Unmarshal([]byte(body), &ator)
+	err := json.Unmarshal([]byte(response), &ator)
 	if err != nil {
 		fmt.Println("Erro ao decodificar JSON:", err)
 		return
 	}
+	getActorAVGrating(ator, results)
+}
 
-	numMovies := len(ator.Movies)
+func getActorAVGrating(ator Ator, results chan<- Ator) {
 	var wgMovies sync.WaitGroup
-	ratings := make(chan float32, numMovies)
+	ratings := make(chan float32, len(ator.Movies))
 	for _, movie := range ator.Movies {
 		wgMovies.Add(1)
 		go getMovieRating(&wgMovies, movie, ratings)
@@ -114,19 +124,17 @@ func handleActor(wgAVGs *sync.WaitGroup, actorID string, results chan<- Ator) {
 		sum += rating
 	}
 
-	ator.AVGrating = sum / float32(numMovies)
+	ator.AVGrating = sum / float32(len(ator.Movies))
 	results <- ator
 }
 
-func getMovieRating(wg *sync.WaitGroup, movieID string, ratings chan<- float32) {
-	defer wg.Done()
-
-	url := fmt.Sprintf("http://150.165.15.91:8001/movies/%s", movieID)
+func getMovieRating(wgMovies *sync.WaitGroup, movieID string, ratings chan<- float32) {
+	defer wgMovies.Done()
+	url := fmt.Sprintf("%s%s%s", BASE_URL, MOVIES_PREFIX, movieID)
 	response := doGet(url)
-	body := readBody(response)
 
 	var movie Movie
-	err := json.Unmarshal(body, &movie)
+	err := json.Unmarshal(response, &movie)
 	if err != nil {
 		fmt.Println("Erro ao decodificar JSON:", err)
 		return
@@ -135,15 +143,12 @@ func getMovieRating(wg *sync.WaitGroup, movieID string, ratings chan<- float32) 
 	ratings <- movie.AverageRating
 }
 
-func doGet(url string) *http.Response {
+func doGet(url string) []byte {
 	response, err := http.Get(url)
 	if err != nil {
 		log.Fatal("Erro ao fazer a requisição:", err.Error())
 	}
-	return response
-}
 
-func readBody(response *http.Response) []byte {
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Fatal("Erro ao ler o corpo da resposta:", err.Error())
