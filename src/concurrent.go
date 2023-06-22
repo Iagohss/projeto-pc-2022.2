@@ -14,18 +14,24 @@ import (
 )
 
 const (
-	ACTORS_PREFIX    = "actors/"
-	MOVIES_PREFIX    = "movies/"
-	BASE_URL         = "http://150.165.15.91:8001/"
-	ACTORS_DATA_PATH = "./data/actors.txt"
-	NUMBER_OF_ACTORS = 100
+	ACTORS_PREFIX         = "actors/"
+	MOVIES_PREFIX         = "movies/"
+	BASE_URL              = "http://150.165.15.91:8001/"
+	ACTORS_DATA_PATH      = "../data/actors.txt"
+	MAX_ACOTRS_GOROUTINES = 200
+	MAX_ACTORS_TO_READ    = 10000
+)
+
+var (
+	GOROUTINES_LOCK   sync.Mutex
+	ACTORS_GOROUTINES = 0
 )
 
 type Ator struct {
-	Id        string   `json:"id"`
-	Name      string   `json:"name"`
-	Movies    []string `json:"movies"`
-	AVGrating float32
+	Id            string   `json:"id"`
+	Name          string   `json:"name"`
+	Movies        []string `json:"movies"`
+	AverageRating float32
 }
 
 type Movie struct {
@@ -46,19 +52,23 @@ func main() {
 	done := make(chan int)
 	go ranking(results, done)
 
+	cont := 0
 	scanner := bufio.NewScanner(file)
 	var wgAVGs sync.WaitGroup
-	cont := 0
 	for scanner.Scan() {
 		actorID := scanner.Text()
 		actorID = actorID[1 : len(actorID)-1]
 
-		wgAVGs.Add(1)
-		go handleActor(&wgAVGs, actorID, results)
+		for {
+			if canStartActorGoroutine() {
+				wgAVGs.Add(1)
+				go handleActor(&wgAVGs, actorID, results)
+				break
+			}
+		}
 
-		//limitando o número de atores analisados, caso contrário o socket crasha
 		cont++
-		if cont == NUMBER_OF_ACTORS {
+		if cont == MAX_ACTORS_TO_READ {
 			break
 		}
 	}
@@ -69,7 +79,7 @@ func main() {
 
 	elapsed := time.Since(start)
 	fmt.Println("\n--------------------------------------------------")
-	fmt.Printf("Total execution time in millis: %d", elapsed/1000000)
+	fmt.Printf("Total execution time in millis: %d", elapsed.Milliseconds())
 }
 
 func ranking(results chan Ator, done chan<- int) {
@@ -79,16 +89,24 @@ func ranking(results chan Ator, done chan<- int) {
 		ranking[i] = Ator{}
 	}
 
+	cont := 0
 	for ator := range results {
-		i := sort.Search(len(ranking), func(i int) bool { return ranking[i].AVGrating <= ator.AVGrating })
-		if i <= len(ranking) {
+		cont++
+		fmt.Printf("atores processados: %d / %d\n", cont, MAX_ACTORS_TO_READ)
+		i := sort.Search(len(ranking), func(i int) bool { return ranking[i].AverageRating <= ator.AverageRating })
+		if i < len(ranking) {
 			ranking = append(ranking[:i], append([]Ator{ator}, ranking[i:]...)...)
 			ranking = ranking[:len(ranking)-1]
 		}
 	}
 
 	for i, ator := range ranking {
-		fmt.Printf("Top %d: {id: %s, name: %s, movies: %v, rating: %.2f}\n", i+1, ator.Id, ator.Name, ator.Movies, ator.AVGrating)
+		fmt.Printf("Top %d: {id: %s, name: %s, movies: %v, rating: %.2f}\n",
+			i+1,
+			ator.Id,
+			ator.Name,
+			ator.Movies,
+			ator.AverageRating)
 	}
 
 	done <- 0
@@ -105,15 +123,19 @@ func handleActor(wgAVGs *sync.WaitGroup, actorID string, results chan<- Ator) {
 		fmt.Println("Erro ao decodificar JSON:", err)
 		return
 	}
-	getActorAVGrating(ator, results)
+	getActorAVGRating(&ator)
+	results <- ator
 }
 
-func getActorAVGrating(ator Ator, results chan<- Ator) {
+func getActorAVGRating(ator *Ator) {
 	var wgMovies sync.WaitGroup
 	ratings := make(chan float32, len(ator.Movies))
 	for _, movie := range ator.Movies {
-		wgMovies.Add(1)
-		go getMovieRating(&wgMovies, movie, ratings)
+		for {
+			wgMovies.Add(1)
+			go getMovieRating(&wgMovies, movie, ratings)
+			break
+		}
 	}
 
 	wgMovies.Wait()
@@ -124,8 +146,8 @@ func getActorAVGrating(ator Ator, results chan<- Ator) {
 		sum += rating
 	}
 
-	ator.AVGrating = sum / float32(len(ator.Movies))
-	results <- ator
+	ator.AverageRating = sum / float32(len(ator.Movies))
+	releaseActorGoroutine()
 }
 
 func getMovieRating(wgMovies *sync.WaitGroup, movieID string, ratings chan<- float32) {
@@ -144,15 +166,35 @@ func getMovieRating(wgMovies *sync.WaitGroup, movieID string, ratings chan<- flo
 }
 
 func doGet(url string) []byte {
-	response, err := http.Get(url)
-	if err != nil {
-		log.Fatal("Erro ao fazer a requisição:", err.Error())
+	var response *http.Response
+	var err error
+	for {
+		response, err = http.Get(url)
+		if err == nil {
+			break
+		}
 	}
 
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal("Erro ao ler o corpo da resposta:", err.Error())
+	var body []byte
+	for {
+		body, err = io.ReadAll(response.Body)
+		if err == nil {
+			break
+		}
 	}
+	defer response.Body.Close()
 
 	return body
+}
+
+func canStartActorGoroutine() bool {
+	GOROUTINES_LOCK.Lock()
+	defer GOROUTINES_LOCK.Unlock()
+	return ACTORS_GOROUTINES < MAX_ACOTRS_GOROUTINES
+}
+
+func releaseActorGoroutine() {
+	GOROUTINES_LOCK.Lock()
+	defer GOROUTINES_LOCK.Unlock()
+	ACTORS_GOROUTINES--
 }
