@@ -14,17 +14,11 @@ import (
 )
 
 const (
-	ACTORS_PREFIX         = "actors/"
-	MOVIES_PREFIX         = "movies/"
-	BASE_URL              = "http://150.165.15.91:8001/"
-	ACTORS_DATA_PATH      = "../data/actors.txt"
-	MAX_ACOTRS_GOROUTINES = 200
-	MAX_ACTORS_TO_READ    = 10000
-)
-
-var (
-	GOROUTINES_LOCK   sync.Mutex
-	ACTORS_GOROUTINES = 0
+	ACTORS_PREFIX      = "actors/"
+	MOVIES_PREFIX      = "movies/"
+	BASE_URL           = "http://150.165.15.91:8001/"
+	ACTORS_DATA_PATH   = "../data/actors.txt"
+	MAX_ACTORS_TO_READ = 10000
 )
 
 type Ator struct {
@@ -59,13 +53,8 @@ func main() {
 		actorID := scanner.Text()
 		actorID = actorID[1 : len(actorID)-1]
 
-		for {
-			if canStartActorGoroutine() {
-				wgAVGs.Add(1)
-				go handleActor(&wgAVGs, actorID, results)
-				break
-			}
-		}
+		wgAVGs.Add(1)
+		go handleActor(&wgAVGs, actorID, results)
 
 		cont++
 		if cont == MAX_ACTORS_TO_READ {
@@ -144,7 +133,6 @@ func getActorAVGRating(ator *Ator) {
 	}
 
 	ator.AverageRating = sum / float32(len(ator.Movies))
-	releaseActorGoroutine()
 }
 
 func getMovieRating(wgMovies *sync.WaitGroup, movieID string, ratings chan<- float32) {
@@ -182,16 +170,4 @@ func doGet(url string) []byte {
 	defer response.Body.Close()
 
 	return body
-}
-
-func canStartActorGoroutine() bool {
-	GOROUTINES_LOCK.Lock()
-	defer GOROUTINES_LOCK.Unlock()
-	return ACTORS_GOROUTINES < MAX_ACOTRS_GOROUTINES
-}
-
-func releaseActorGoroutine() {
-	GOROUTINES_LOCK.Lock()
-	defer GOROUTINES_LOCK.Unlock()
-	ACTORS_GOROUTINES--
 }
