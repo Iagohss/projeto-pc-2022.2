@@ -131,11 +131,8 @@ func getActorAVGRating(ator *Ator) {
 	var wgMovies sync.WaitGroup
 	ratings := make(chan float32, len(ator.Movies))
 	for _, movie := range ator.Movies {
-		for {
-			wgMovies.Add(1)
-			go getMovieRating(&wgMovies, movie, ratings)
-			break
-		}
+		wgMovies.Add(1)
+		go getMovieRating(&wgMovies, movie, ratings)
 	}
 
 	wgMovies.Wait()
