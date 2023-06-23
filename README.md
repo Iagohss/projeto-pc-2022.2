@@ -1,6 +1,7 @@
 # Projeto de Programação Concorrente 2022.2
+
 Implementação do CineLsd como projeto para disciplina de concorrente na linguagem Go. 
-[Código base](https://github.com/pedrohenrique-ql/concorrente-lab-base).
+[Laboratorio Base](https://github.com/AmiltonCabral/lab-pc-2022.2.git)
 
 ## 🛠️ Construído com
 
