@@ -1,4 +1,4 @@
-# Lab de Programação Concorrente 2022.2
+# Projeto de Programação Concorrente 2022.2
 
  realizando a reimplementação do projeto utilizando a linguagem de programação Java.
  
