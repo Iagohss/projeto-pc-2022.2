@@ -1,6 +1,4 @@
 # Projeto de Programação Concorrente 2022.2
-
- realizando a reimplementação do projeto utilizando a linguagem de programação Java.
  
 [Código base](https://github.com/pedrohenrique-ql/concorrente-lab-base).
 
