@@ -6,7 +6,6 @@
 
 ## 🛠️ Construído com
 
-- [Maven](https://maven.apache.org/) - Gerente de Dependência
 - [Go 1.20.5](https://go.dev/learn/) - Linguagem de implementação
  
 ## ✒️ Autores
