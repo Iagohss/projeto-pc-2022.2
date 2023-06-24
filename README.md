@@ -13,6 +13,9 @@ Implementação do CineLsd como projeto para disciplina de concorrente na lingua
 *  **Iago Silva** - *Desenvolvedor especializado em programação concorrente.* - [Iagohss](https://github.com/Iagohss)
 *  **Joab Cesar** - *Responsável por testes, processamento e desenvolvimento auxiliar.* - [Joabcmp](https://github.com/joabcmp)
 
+    Embora o desenvolvimento do projeto foi dividido igualmente estando todos presentes em reuniões sincronas de forma online.
+
+
 ### 🍷🗿 Estrategias adotadas
 
 - A concorrência é introduzida por meio do uso de Go Routines. Para cada id lido no arquivo actors.txt é criada uma Go Routine executando a função handleActor. Onde, uma requisição é feita ao banco de dados para obter os dados de um ator específico. Em seguida, é criada uma nova goroutine para cada filme associado a esse ator. Desse modo, os processamentos e requisições relacionados a cada ator podem ser feitos concorrentemente, aumentando o desempenho do sistema.
